@@ -26,6 +26,7 @@
 #include <unitree/common/thread/thread.hpp>
 #include <unitree/robot/b2/motion_switcher/motion_switcher_client.hpp>
 #include <csignal>
+#include <array>
 
 #if defined(USE_ROS1) && defined(USE_ROS)
 #include <ros/ros.h>
@@ -121,6 +122,8 @@ private:
     // others
     std::vector<float> mapped_joint_positions;
     std::vector<float> mapped_joint_velocities;
+    std::array<float, 3> filtered_commands_{{0.0f, 0.0f, 0.0f}};
+    bool filtered_commands_initialized_ = false;
 
 #if defined(USE_ROS1) && defined(USE_ROS)
     geometry_msgs::Twist cmd_vel;

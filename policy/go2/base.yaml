@@ -4,6 +4,10 @@
 go2:
   dt: 0.005
   decimation: 4
+  cmd_deadband_xy: 0.05
+  cmd_deadband_yaw: 0.08
+  cmd_lpf_alpha: 0.2
+  cmd_limit: [1.0, 1.0, 1.0]
   fixed_kp: [80.0, 80.0, 80.0,
              80.0, 80.0, 80.0,
              80.0, 80.0, 80.0,

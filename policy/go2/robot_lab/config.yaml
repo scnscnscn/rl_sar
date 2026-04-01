@@ -3,10 +3,16 @@
 
 go2/robot_lab:
   model_name: "policy.pt"
-  num_observations: 45
-  observations: ["ang_vel", "gravity_vec", "commands", "dof_pos", "dof_vel", "actions"]
-  observations_history: []  # 0 is the latest observation
-  observations_history_priority: "time"  # "time" or "term" priority
+  num_observations: 47
+  # phase 2 + ang_vel 3 + gravity 3 + commands 3 + dof_pos 12 + dof_vel 12 + actions 12
+  observations: ["phase","ang_vel", "gravity_vec", "commands", "dof_pos", "dof_vel", "actions"]
+  
+  phase_scale: 3.0
+  phase_cycle_period: [0.5, 0.8]  # [min_period, max_period]
+  phase_velocity_limit: [0.5, 1.8]  # [stand_threshold, saturation_speed]
+
+  observations_history: [9,8,7,6,5,4,3,2,1,0]  # 0 is the latest observation
+  observations_history_priority: "term"  # "time" or "term" priority
   clip_obs: 100.0
   clip_actions_lower: [-100.0, -100.0, -100.0,
                        -100.0, -100.0, -100.0,
@@ -20,10 +26,10 @@ go2/robot_lab:
           20.0, 20.0, 20.0,
           20.0, 20.0, 20.0,
           20.0, 20.0, 20.0]
-  rl_kd: [0.5, 0.5, 0.5,
-          0.5, 0.5, 0.5,
-          0.5, 0.5, 0.5,
-          0.5, 0.5, 0.5]
+  rl_kd: [1.2, 1.2, 1.2,
+          1.2, 1.2, 1.2,
+          1.2, 1.2, 1.2,
+          1.2, 1.2, 1.2]
   fixed_kp: [80.0, 80.0, 80.0,
              80.0, 80.0, 80.0,
              80.0, 80.0, 80.0,

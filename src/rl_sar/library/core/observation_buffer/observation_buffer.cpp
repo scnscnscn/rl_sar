@@ -42,6 +42,7 @@ ObservationBuffer::ObservationBuffer(int num_envs,
 
     // Initialize buffer: [env][time][obs]
     obs_buf.resize(num_envs);
+    env_initialized.assign(num_envs, false);
     for (int env_idx = 0; env_idx < num_envs; ++env_idx)
     {
         obs_buf[env_idx].resize(history_length);
@@ -72,6 +73,10 @@ void ObservationBuffer::reset(std::vector<int> reset_idxs, const std::vector<flo
                     obs_buf[env_idx][t][i] = new_obs[i];
                 }
             }
+            if (new_obs.size() == static_cast<size_t>(num_obs_total))
+            {
+                env_initialized[env_idx] = true;
+            }
         }
     }
 }
@@ -86,6 +91,17 @@ void ObservationBuffer::insert(const std::vector<float>& new_obs)
     // Shift historical observations forward by one position for all environments
     for (int env_idx = 0; env_idx < num_envs; ++env_idx)
     {
+        // IsaacLab-compatible warm start: first valid insert fills the whole history with current obs.
+        if (!env_initialized[env_idx])
+        {
+            for (int t = 0; t < history_length; ++t)
+            {
+                obs_buf[env_idx][t] = new_obs;
+            }
+            env_initialized[env_idx] = true;
+            continue;
+        }
+
         // Move from back to front to avoid overwriting
         for (int t = history_length - 1; t > 0; --t)
         {
