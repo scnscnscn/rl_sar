@@ -5,6 +5,26 @@
 
 #include "rl_real_go2.hpp"
 
+#include <algorithm>
+#include <cmath>
+
+namespace
+{
+float ApplyDeadband(float value, float deadband)
+{
+    return (std::fabs(value) < deadband) ? 0.0f : value;
+}
+
+float ClampWithLimit(float value, float limit)
+{
+    if (limit <= 0.0f)
+    {
+        return value;
+    }
+    return std::clamp(value, -limit, limit);
+}
+}
+
 RL_Real::RL_Real(int argc, char **argv)
 {
     bool wheel_mode = (argc > 2 && std::string(argv[2]) == "wheel");
@@ -215,14 +235,41 @@ void RL_Real::RunModel()
     {
         this->episode_length_buf += 1;
         this->obs.ang_vel = this->robot_state.imu.gyroscope;
-        this->obs.commands = {this->control.x, this->control.y, this->control.yaw};
+        std::array<float, 3> command_raw = {this->control.x, this->control.y, this->control.yaw};
 #if !defined(USE_CMAKE) && defined(USE_ROS)
         if (this->control.navigation_mode)
         {
-            this->obs.commands = {(float)this->cmd_vel.linear.x, (float)this->cmd_vel.linear.y, (float)this->cmd_vel.angular.z};
+            command_raw = {(float)this->cmd_vel.linear.x, (float)this->cmd_vel.linear.y, (float)this->cmd_vel.angular.z};
 
         }
 #endif
+
+        const float cmd_deadband_xy = this->params.Get<float>("cmd_deadband_xy", 0.05f);
+        const float cmd_deadband_yaw = this->params.Get<float>("cmd_deadband_yaw", 0.08f);
+        const float cmd_lpf_alpha = std::clamp(this->params.Get<float>("cmd_lpf_alpha", 0.2f), 0.0f, 1.0f);
+        const auto cmd_limit = this->params.Get<std::vector<float>>("cmd_limit", {1.0f, 1.0f, 1.0f});
+        const float limit_x = cmd_limit.size() > 0 ? cmd_limit[0] : 1.0f;
+        const float limit_y = cmd_limit.size() > 1 ? cmd_limit[1] : limit_x;
+        const float limit_yaw = cmd_limit.size() > 2 ? cmd_limit[2] : limit_y;
+
+        command_raw[0] = ClampWithLimit(ApplyDeadband(command_raw[0], cmd_deadband_xy), limit_x);
+        command_raw[1] = ClampWithLimit(ApplyDeadband(command_raw[1], cmd_deadband_xy), limit_y);
+        command_raw[2] = ClampWithLimit(ApplyDeadband(command_raw[2], cmd_deadband_yaw), limit_yaw);
+
+        if (!this->filtered_commands_initialized_)
+        {
+            this->filtered_commands_ = command_raw;
+            this->filtered_commands_initialized_ = true;
+        }
+        else
+        {
+            for (size_t i = 0; i < this->filtered_commands_.size(); ++i)
+            {
+                this->filtered_commands_[i] += cmd_lpf_alpha * (command_raw[i] - this->filtered_commands_[i]);
+            }
+        }
+
+        this->obs.commands = {this->filtered_commands_[0], this->filtered_commands_[1], this->filtered_commands_[2]};
         this->obs.base_quat = this->robot_state.imu.quaternion;
         this->obs.dof_pos = this->robot_state.motor_state.q;
         this->obs.dof_vel = this->robot_state.motor_state.dq;

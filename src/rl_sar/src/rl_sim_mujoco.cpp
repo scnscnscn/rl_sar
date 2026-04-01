@@ -201,7 +201,17 @@ void RL_Sim::RobotControl()
         if (this->mj_model && this->mj_data)
         {
             mj_resetData(this->mj_model, this->mj_data);
+            // Reset joint positions to default_dof_pos and clear velocities
+            const auto default_pos = this->params.Get<std::vector<float>>("default_dof_pos");
+            const auto joint_mapping = this->params.Get<std::vector<int>>("joint_mapping");
+            for (size_t i = 0; i < joint_mapping.size() && i < default_pos.size(); ++i)
+            {
+                int ctrl_idx = joint_mapping[i];
+                mj_data->qpos[ctrl_idx] = default_pos[i];
+                mj_data->qvel[ctrl_idx] = 0.0;
+            }
             mj_forward(this->mj_model, this->mj_data);
+            this->episode_length_buf = 0;
         }
     }
     if (this->control.current_keyboard == Input::Keyboard::Enter || this->control.current_gamepad == Input::Gamepad::RB_X)
