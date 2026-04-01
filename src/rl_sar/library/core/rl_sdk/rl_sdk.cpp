@@ -110,6 +110,51 @@ std::vector<float> RL::ComputeObservation()
         {
             obs_list.push_back(this->obs.actions);
         }
+        else if (observation == "phase" || observation == "cycle_phase_vel")
+        {
+            // Velocity-adaptive gait phase encoded as [sin(2pi*phase), cos(2pi*phase)].
+            // When nearly standing, keep neutral phase [0, 1].
+            const auto cycle_period = this->params.Get<std::vector<float>>("phase_cycle_period", {0.5f, 0.8f});
+            const auto velocity_limit = this->params.Get<std::vector<float>>("phase_velocity_limit", {0.5f, 1.8f});
+
+            const float period_min = cycle_period.size() > 0 ? cycle_period[0] : 0.5f;
+            const float period_max = cycle_period.size() > 1 ? cycle_period[1] : period_min;
+            const float vel_min = velocity_limit.size() > 0 ? velocity_limit[0] : 0.5f;
+            const float vel_max = velocity_limit.size() > 1 ? velocity_limit[1] : vel_min;
+
+            const float cmd_x = this->obs.commands.size() > 0 ? this->obs.commands[0] : 0.0f;
+            const float cmd_y = this->obs.commands.size() > 1 ? this->obs.commands[1] : 0.0f;
+            const float cmd_speed = std::sqrt(cmd_x * cmd_x + cmd_y * cmd_y);
+
+            std::vector<float> phase_vec = {0.0f, 1.0f};
+            if (cmd_speed >= vel_min)
+            {
+                const float dt = this->params.Get<float>("dt");
+                const int decimation = this->params.Get<int>("decimation");
+                const float motion_time = this->episode_length_buf * dt * decimation;
+
+                float speed_ratio = 0.0f;
+                if (vel_max > vel_min)
+                {
+                    const float speed_clamped = std::min(std::max(cmd_speed, vel_min), vel_max);
+                    speed_ratio = (speed_clamped - vel_min) / (vel_max - vel_min);
+                }
+
+                const float adaptive_period = period_max - speed_ratio * (period_max - period_min);
+                if (adaptive_period > 1e-6f)
+                {
+                    const float pi = 3.14159265358979323846f;
+                    const float phase = std::fmod(motion_time / adaptive_period, 1.0f);
+                    phase_vec[0] = std::sin(2.0f * pi * phase);
+                    phase_vec[1] = std::cos(2.0f * pi * phase);
+                }
+            }
+            // Match training pipeline: clip phase embedding to [-1, 1] then apply scale.
+            const float phase_scale = this->params.Get<float>("phase_scale", 3.0f);
+            phase_vec = clamp(phase_vec, -1.0f, 1.0f);
+            phase_vec = phase_vec * phase_scale;
+            obs_list.push_back(phase_vec);
+        }
         // ============= Other Observations =============
         else if (observation == "whole_body_tracking/motion_command")
         {
