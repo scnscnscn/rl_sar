@@ -287,7 +287,7 @@ void RobotJointControllerGroup::SetCommandCallback(const robot_msgs::msg::RobotC
 
 void RobotJointControllerGroup::PositionLimit(double &position, int &index)
 {
-    position = std::clamp(position, joints_urdf_[index]->limits->lower,joints_urdf_[index]->limits->upper);
+    position = std::clamp(position, joints_urdf_[index]->limits->lower, joints_urdf_[index]->limits->upper);
 }
 
 void RobotJointControllerGroup::VelocityLimit(double &velocity, int &index)
